@@ -1,8 +1,10 @@
 'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Shield, Map, AlertTriangle, Bell, LayoutDashboard } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Shield, Map, AlertTriangle, Bell, LayoutDashboard, LogOut } from 'lucide-react'
 import SOSButton from '@/components/sos/SOSButton'
+import { getUser, logout } from '@/services/auth'
 
 const navItems = [
   { href: '/map', icon: <Map size={20} />, label: 'Mapa' },
@@ -12,6 +14,36 @@ const navItems = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const [checking, setChecking] = useState(true)
+  const [initial, setInitial] = useState('?')
+
+  // Protección de ruta: verifica que haya sesión activa
+  useEffect(() => {
+    getUser().then(user => {
+      if (!user) {
+        router.replace('/login')
+      } else {
+        const label = user.signInDetails?.loginId || user.username || ''
+        setInitial(label.charAt(0).toUpperCase() || 'U')
+        setChecking(false)
+      }
+    })
+  }, [router])
+
+  const handleLogout = async () => {
+    await logout()
+    router.replace('/login')
+  }
+
+  // Mientras verifica la sesión, muestra una pantalla de carga
+  if (checking) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <span className="w-8 h-8 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
@@ -45,8 +77,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
           </button>
           <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-sm font-bold">
-            Y
+            {initial}
           </div>
+          <button
+            onClick={handleLogout}
+            title="Cerrar sesión"
+            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <LogOut size={20} />
+          </button>
         </div>
       </nav>
 

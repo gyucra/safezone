@@ -1,18 +1,23 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
-import { Shield, Mail, Lock, User, Eye, EyeOff } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Shield, Mail, Lock, User, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { register, confirmRegister } from '@/services/auth'
 
 export default function RegisterPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [step, setStep] = useState<'form' | 'confirm'>('form')
+  const [code, setCode] = useState('')
   const [form, setForm] = useState({
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
   })
-  const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -22,8 +27,28 @@ export default function RegisterPage() {
       return
     }
     setLoading(true)
-    // TODO: conectar con AWS Cognito
-    setTimeout(() => setLoading(false), 1500)
+    try {
+      await register(form.email, form.password, form.name)
+      setStep('confirm')
+    } catch (err: any) {
+      setError(err.message || 'Error al crear la cuenta')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleConfirm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await confirmRegister(form.email, code)
+      router.push('/login')
+    } catch (err: any) {
+      setError(err.message || 'Código incorrecto')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -38,99 +63,140 @@ export default function RegisterPage() {
           <h1 className="text-2xl font-black text-white">
             Safe<span className="text-red-500">Zone</span>
           </h1>
-          <p className="text-gray-400 mt-1">Crea tu cuenta gratuita</p>
+          <p className="text-gray-400 mt-1">
+            {step === 'form' ? 'Crea tu cuenta gratuita' : 'Confirma tu email'}
+          </p>
         </div>
 
         {/* Form */}
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-            {/* Name */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-300">Nombre completo</label>
-              <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type="text"
-                  placeholder="Tu nombre"
-                  value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
-                  required
-                />
-              </div>
-            </div>
+          {step === 'form' ? (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-            {/* Email */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-300">Email</label>
-              <div className="relative">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type="email"
-                  placeholder="tu@email.com"
-                  value={form.email}
-                  onChange={e => setForm({ ...form, email: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
-                  required
-                />
+              {/* Name */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-300">Nombre completo</label>
+                <div className="relative">
+                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type="text"
+                    placeholder="Tu nombre"
+                    value={form.name}
+                    onChange={e => setForm({ ...form, name: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
+                    required
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Password */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-300">Contraseña</label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Mínimo 8 caracteres"
-                  value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
-                  required
-                  minLength={8}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
+              {/* Email */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-300">Email</label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type="email"
+                    placeholder="tu@email.com"
+                    value={form.email}
+                    onChange={e => setForm({ ...form, email: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
+                    required
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* Confirm Password */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-gray-300">Confirmar contraseña</label>
-              <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Repite tu contraseña"
-                  value={form.confirmPassword}
-                  onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
-                  className={`w-full bg-gray-800 border rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none transition-colors ${
-                    error ? 'border-red-500' : 'border-gray-700 focus:border-red-500'
-                  }`}
-                  required
-                />
+              {/* Password */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-300">Contraseña</label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Mínimo 8 caracteres"
+                    value={form.password}
+                    onChange={e => setForm({ ...form, password: e.target.value })}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-10 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors"
+                    required
+                    minLength={8}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
+
+              {/* Confirm Password */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-300">Confirmar contraseña</label>
+                <div className="relative">
+                  <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Repite tu contraseña"
+                    value={form.confirmPassword}
+                    onChange={e => setForm({ ...form, confirmPassword: e.target.value })}
+                    className={`w-full bg-gray-800 border rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none transition-colors ${
+                      error ? 'border-red-500' : 'border-gray-700 focus:border-red-500'
+                    }`}
+                    required
+                  />
+                </div>
+              </div>
+
               {error && <span className="text-xs text-red-400">{error}</span>}
-            </div>
 
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg py-3 font-bold transition-colors flex items-center justify-center gap-2 mt-2"
-            >
-              {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-              {loading ? 'Creando cuenta...' : 'Crear cuenta gratis'}
-            </button>
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg py-3 font-bold transition-colors flex items-center justify-center gap-2 mt-2"
+              >
+                {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {loading ? 'Creando cuenta...' : 'Crear cuenta gratis'}
+              </button>
 
-          </form>
+            </form>
+          ) : (
+            <form onSubmit={handleConfirm} className="flex flex-col gap-4">
+              <p className="text-sm text-gray-400 text-center">
+                Enviamos un código de 6 dígitos a<br />
+                <span className="text-white font-medium">{form.email}</span>
+              </p>
+
+              {/* Code */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-gray-300">Código de verificación</label>
+                <div className="relative">
+                  <KeyRound size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                  <input
+                    type="text"
+                    placeholder="123456"
+                    value={code}
+                    onChange={e => setCode(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-red-500 transition-colors tracking-widest"
+                    required
+                    maxLength={6}
+                  />
+                </div>
+              </div>
+
+              {error && <span className="text-xs text-red-400">{error}</span>}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg py-3 font-bold transition-colors flex items-center justify-center gap-2 mt-2"
+              >
+                {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {loading ? 'Verificando...' : 'Confirmar cuenta'}
+              </button>
+            </form>
+          )}
 
           <p className="text-center text-gray-500 text-sm mt-6">
             ¿Ya tienes cuenta?{' '}

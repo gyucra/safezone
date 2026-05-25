@@ -1,18 +1,31 @@
 'use client'
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Shield, Mail, Lock, Eye, EyeOff } from 'lucide-react'
+import { login } from '@/services/auth'
 
 export default function LoginPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
   const [form, setForm] = useState({ email: '', password: '' })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     setLoading(true)
-    // TODO: conectar con AWS Cognito
-    setTimeout(() => setLoading(false), 1500)
+    try {
+      const { isSignedIn } = await login(form.email, form.password)
+      if (isSignedIn) {
+        router.push('/admin')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Email o contraseña incorrectos')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -72,6 +85,8 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+
+            {error && <span className="text-xs text-red-400">{error}</span>}
 
             {/* Submit */}
             <button
