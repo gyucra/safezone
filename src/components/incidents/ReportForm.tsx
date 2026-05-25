@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react'
 import { MapPin, Camera, AlertTriangle, X, Check, Loader } from 'lucide-react'
 import { CreateIncidentDto, IncidentType, UrgencyLevel, Location } from '@/types'
 import { INCIDENT_ICONS } from '@/lib/map'
+import { createIncident } from '@/services/incidents'
+import { useAppStore } from '@/store/useAppStore'
 
 interface ReportFormProps {
   onClose: () => void
@@ -31,6 +33,8 @@ export default function ReportForm({ onClose, onSuccess }: ReportFormProps) {
   const [loading, setLoading] = useState(false)
   const [locating, setLocating] = useState(false)
   const [success, setSuccess] = useState(false)
+  const addIncident = useAppStore(s => s.addIncident)
+  const user = useAppStore(s => s.user)
 
   const [form, setForm] = useState<CreateIncidentDto>({
     type: 'robo',
@@ -78,16 +82,27 @@ export default function ReportForm({ onClose, onSuccess }: ReportFormProps) {
     )
   }
 
+
+
   const handleSubmit = async () => {
     setLoading(true)
-    // Simular envío a API
-    await new Promise(r => setTimeout(r, 1500))
-    setLoading(false)
-    setSuccess(true)
-    setTimeout(() => {
-      onSuccess(form)
-      onClose()
-    }, 2000)
+    try {
+      const nuevo = await createIncident({
+        ...form,
+        userId: user?.id || 'anonimo',
+        userName: user?.name || 'Ciudadano',
+      })
+      addIncident(nuevo)          // lo agrega al store para que aparezca al instante
+      setLoading(false)
+      setSuccess(true)
+      setTimeout(() => {
+        onSuccess(form)
+        onClose()
+      }, 2000)
+    } catch (err) {
+      setLoading(false)
+      alert('Error al enviar el reporte. Intenta de nuevo.')
+    }
   }
 
   if (success) return (
