@@ -21,3 +21,25 @@ export async function createIncident(
   if (!res.ok) throw new Error('Error al crear incidente')
   return res.json()
 }
+// Subir una foto a S3 y devolver su URL pública
+export async function uploadPhoto(file: File): Promise<string> {
+  // 1. Pedir a la API una URL temporal de subida
+  const res = await fetch(`${API_URL}/upload-url`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fileType: file.type }),
+  })
+  if (!res.ok) throw new Error('Error al obtener URL de subida')
+  const { uploadUrl, publicUrl } = await res.json()
+
+  // 2. Subir la foto directo a S3 con esa URL
+  const upload = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  })
+  if (!upload.ok) throw new Error('Error al subir la foto')
+
+  // 3. Devolver la URL pública para guardarla en el incidente
+  return publicUrl
+}

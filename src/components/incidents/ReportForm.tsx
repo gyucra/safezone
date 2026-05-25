@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { MapPin, Camera, AlertTriangle, X, Check, Loader } from 'lucide-react'
 import { CreateIncidentDto, IncidentType, UrgencyLevel, Location } from '@/types'
 import { INCIDENT_ICONS } from '@/lib/map'
-import { createIncident } from '@/services/incidents'
+import { createIncident, uploadPhoto } from '@/services/incidents'
 import { useAppStore } from '@/store/useAppStore'
 
 interface ReportFormProps {
@@ -35,6 +35,7 @@ export default function ReportForm({ onClose, onSuccess }: ReportFormProps) {
   const [success, setSuccess] = useState(false)
   const addIncident = useAppStore(s => s.addIncident)
   const user = useAppStore(s => s.user)
+  const [photo, setPhoto] = useState<File | null>(null)
 
   const [form, setForm] = useState<CreateIncidentDto>({
     type: 'robo',
@@ -82,13 +83,17 @@ export default function ReportForm({ onClose, onSuccess }: ReportFormProps) {
     )
   }
 
-
-
   const handleSubmit = async () => {
     setLoading(true)
     try {
+      // Si hay foto, súbela primero a S3
+      let imageUrl = ''
+      if (photo) {
+        imageUrl = await uploadPhoto(photo)
+      }
       const nuevo = await createIncident({
         ...form,
+        imageUrl,
         userId: user?.id || 'anonimo',
         userName: user?.name || 'Ciudadano',
       })
@@ -322,11 +327,16 @@ export default function ReportForm({ onClose, onSuccess }: ReportFormProps) {
                   background: '#1f2937', border: '2px dashed #374151',
                   borderRadius: '10px', cursor: 'pointer'
                 }}>
-                  <Camera size={24} color="#6b7280" />
-                  <span style={{ color: '#6b7280', fontSize: '13px' }}>
-                    Toca para adjuntar evidencia
+                  <Camera size={24} color={photo ? '#22c55e' : '#6b7280'} />
+                  <span style={{ color: photo ? '#86efac' : '#6b7280', fontSize: '13px' }}>
+                    {photo ? photo.name : 'Toca para adjuntar evidencia'}
                   </span>
-                  <input type="file" accept="image/*,video/*" style={{ display: 'none' }} />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={e => setPhoto(e.target.files?.[0] || null)}
+                  />
                 </label>
               </div>
 
