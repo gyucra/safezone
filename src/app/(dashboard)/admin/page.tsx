@@ -1,42 +1,89 @@
+'use client'
+import { useEffect, useState } from 'react'
 import { Shield, AlertTriangle, CheckCircle, Users, Clock, TrendingUp, MapPin, Activity } from 'lucide-react'
-
-const stats = [
-  { label: 'Incidentes activos', value: '24', icon: <AlertTriangle size={20} />, color: '#ef4444', bg: '#450a0a' },
-  { label: 'Resueltos hoy', value: '18', icon: <CheckCircle size={20} />, color: '#22c55e', bg: '#052e16' },
-  { label: 'Usuarios activos', value: '3,240', icon: <Users size={20} />, color: '#3b82f6', bg: '#172554' },
-  { label: 'Tiempo respuesta', value: '4.2 min', icon: <Clock size={20} />, color: '#f59e0b', bg: '#451a03' },
-]
-
-const recentIncidents = [
-  { id: 1, type: '🔪', title: 'Robo a mano armada', zone: 'Miraflores', urgency: 'Alto', status: 'Activo', time: 'hace 5 min' },
-  { id: 2, type: '🚗', title: 'Accidente de tránsito', zone: 'San Isidro', urgency: 'Medio', status: 'En proceso', time: 'hace 12 min' },
-  { id: 3, type: '🚑', title: 'Emergencia médica', zone: 'Surquillo', urgency: 'Crítico', status: 'Activo', time: 'hace 18 min' },
-  { id: 4, type: '⚠️', title: 'Disturbio en vía pública', zone: 'Barranco', urgency: 'Bajo', status: 'Resuelto', time: 'hace 1h' },
-  { id: 5, type: '👤', title: 'Persona desaparecida', zone: 'La Molina', urgency: 'Alto', status: 'En proceso', time: 'hace 2h' },
-]
-
-const zones = [
-  { name: 'Miraflores', incidents: 8, trend: '+2', color: '#ef4444' },
-  { name: 'San Isidro', incidents: 5, trend: '-1', color: '#f97316' },
-  { name: 'Surquillo', incidents: 4, trend: '+1', color: '#f97316' },
-  { name: 'Barranco', incidents: 3, trend: '0', color: '#eab308' },
-  { name: 'La Molina', incidents: 2, trend: '-1', color: '#22c55e' },
-]
+import { getIncidents } from '@/services/incidents'
+import { Incident } from '@/types'
+import { INCIDENT_ICONS } from '@/lib/map'
 
 const urgencyColors: Record<string, string> = {
-  'Crítico': '#dc2626',
-  'Alto': '#ea580c',
-  'Medio': '#ca8a04',
-  'Bajo': '#16a34a',
+  critico: '#dc2626',
+  alto: '#ea580c',
+  medio: '#ca8a04',
+  bajo: '#16a34a',
 }
 
 const statusColors: Record<string, string> = {
-  'Activo': '#dc2626',
-  'En proceso': '#2563eb',
-  'Resuelto': '#16a34a',
+  activo: '#dc2626',
+  en_proceso: '#2563eb',
+  resuelto: '#16a34a',
+  falso_reporte: '#6b7280',
+}
+
+const urgencyLabels: Record<string, string> = {
+  critico: 'Crítico', alto: 'Alto', medio: 'Medio', bajo: 'Bajo',
+}
+const statusLabels: Record<string, string> = {
+  activo: 'Activo', en_proceso: 'En proceso', resuelto: 'Resuelto', falso_reporte: 'Falso',
+}
+
+// Calcula "hace X tiempo" desde una fecha
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'hace un momento'
+  if (mins < 60) return `hace ${mins} min`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `hace ${hrs}h`
+  const days = Math.floor(hrs / 24)
+  return `hace ${days}d`
+}
+
+// Saca el nombre corto de la zona desde la dirección
+function getZone(address?: string): string {
+  if (!address) return 'Sin zona'
+  const parts = address.split(',')
+  return parts[parts.length - 1]?.trim() || parts[0]?.trim() || 'Sin zona'
 }
 
 export default function AdminPage() {
+  const [incidents, setIncidents] = useState<Incident[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getIncidents()
+      .then(data => setIncidents(data))
+      .catch(() => setIncidents([]))
+      .finally(() => setLoading(false))
+  }, [])
+
+  // Calcular stats reales
+  const activos = incidents.filter(i => i.status === 'activo').length
+  const resueltos = incidents.filter(i => i.status === 'resuelto').length
+  const enProceso = incidents.filter(i => i.status === 'en_proceso').length
+  const total = incidents.length
+
+  const stats = [
+    { label: 'Incidentes activos', value: String(activos), icon: <AlertTriangle size={20} />, color: '#ef4444', bg: '#450a0a' },
+    { label: 'Resueltos', value: String(resueltos), icon: <CheckCircle size={20} />, color: '#22c55e', bg: '#052e16' },
+    { label: 'Total reportados', value: String(total), icon: <Users size={20} />, color: '#3b82f6', bg: '#172554' },
+    { label: 'En proceso', value: String(enProceso), icon: <Clock size={20} />, color: '#f59e0b', bg: '#451a03' },
+  ]
+
+  // Incidentes recientes (los 5 más nuevos)
+  const recentIncidents = incidents.slice(0, 5)
+
+  // Zonas: agrupar por zona y contar
+  const zoneMap: Record<string, number> = {}
+  incidents.forEach(i => {
+    const z = getZone(i.location.address)
+    zoneMap[z] = (zoneMap[z] || 0) + 1
+  })
+  const zones = Object.entries(zoneMap)
+    .map(([name, count]) => ({ name, incidents: count }))
+    .sort((a, b) => b.incidents - a.incidents)
+    .slice(0, 5)
+  const maxZone = Math.max(1, ...zones.map(z => z.incidents))
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
 
@@ -79,30 +126,36 @@ export default function AdminPage() {
             <span className="text-gray-500 text-xs">Últimas 24h</span>
           </div>
           <div className="flex flex-col gap-2">
-            {recentIncidents.map(inc => (
-              <div key={inc.id} style={{ background: '#1f2937' }} className="rounded-lg p-3 flex items-center gap-3">
-                <span className="text-xl">{inc.type}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-white text-sm font-medium truncate">{inc.title}</span>
+            {loading ? (
+              <p className="text-gray-500 text-sm text-center py-8">Cargando...</p>
+            ) : recentIncidents.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-8">No hay incidentes reportados aún</p>
+            ) : (
+              recentIncidents.map(inc => (
+                <div key={inc.id} style={{ background: '#1f2937' }} className="rounded-lg p-3 flex items-center gap-3">
+                  <span className="text-xl">{INCIDENT_ICONS[inc.type]}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-white text-sm font-medium truncate">{inc.title}</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <MapPin size={10} className="text-gray-500" />
+                      <span className="text-gray-400 text-xs truncate">{getZone(inc.location.address)}</span>
+                      <span className="text-gray-600 text-xs">·</span>
+                      <span className="text-gray-500 text-xs whitespace-nowrap">{timeAgo(inc.createdAt)}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <MapPin size={10} className="text-gray-500" />
-                    <span className="text-gray-400 text-xs">{inc.zone}</span>
-                    <span className="text-gray-600 text-xs">·</span>
-                    <span className="text-gray-500 text-xs">{inc.time}</span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span style={{ background: urgencyColors[inc.urgency] + '20', color: urgencyColors[inc.urgency] }} className="text-xs font-bold px-2 py-0.5 rounded-full">
+                      {urgencyLabels[inc.urgency]}
+                    </span>
+                    <span style={{ background: statusColors[inc.status] + '20', color: statusColors[inc.status] }} className="text-xs px-2 py-0.5 rounded-full">
+                      {statusLabels[inc.status]}
+                    </span>
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span style={{ background: urgencyColors[inc.urgency] + '20', color: urgencyColors[inc.urgency] }} className="text-xs font-bold px-2 py-0.5 rounded-full">
-                    {inc.urgency}
-                  </span>
-                  <span style={{ background: statusColors[inc.status] + '20', color: statusColors[inc.status] }} className="text-xs px-2 py-0.5 rounded-full">
-                    {inc.status}
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -113,28 +166,27 @@ export default function AdminPage() {
             Zonas críticas
           </h2>
           <div className="flex flex-col gap-3">
-            {zones.map((zone, i) => (
-              <div key={zone.name}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-gray-300 text-sm">{zone.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span style={{ color: zone.trend.startsWith('+') ? '#ef4444' : zone.trend === '0' ? '#6b7280' : '#22c55e' }} className="text-xs font-bold">
-                      {zone.trend}
-                    </span>
+            {zones.length === 0 ? (
+              <p className="text-gray-500 text-sm">Sin datos de zonas</p>
+            ) : (
+              zones.map(zone => (
+                <div key={zone.name}>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-gray-300 text-sm truncate">{zone.name}</span>
                     <span className="text-white text-sm font-bold">{zone.incidents}</span>
                   </div>
+                  <div style={{ background: '#1f2937', borderRadius: '4px', height: '6px' }}>
+                    <div style={{
+                      width: `${(zone.incidents / maxZone) * 100}%`,
+                      background: '#ef4444',
+                      height: '100%',
+                      borderRadius: '4px',
+                      transition: 'width 1s ease'
+                    }} />
+                  </div>
                 </div>
-                <div style={{ background: '#1f2937', borderRadius: '4px', height: '6px' }}>
-                  <div style={{
-                    width: `${(zone.incidents / 8) * 100}%`,
-                    background: zone.color,
-                    height: '100%',
-                    borderRadius: '4px',
-                    transition: 'width 1s ease'
-                  }} />
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Mini stats */}
@@ -145,10 +197,10 @@ export default function AdminPage() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { label: 'Reportados', value: '42' },
-                { label: 'Resueltos', value: '18' },
-                { label: 'Falsos', value: '3' },
-                { label: 'SOS activos', value: '1' },
+                { label: 'Reportados', value: String(total) },
+                { label: 'Resueltos', value: String(resueltos) },
+                { label: 'Activos', value: String(activos) },
+                { label: 'En proceso', value: String(enProceso) },
               ].map(item => (
                 <div key={item.label} className="text-center">
                   <div className="text-white font-black text-lg">{item.value}</div>
