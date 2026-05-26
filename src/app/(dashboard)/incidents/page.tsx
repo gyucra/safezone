@@ -1,9 +1,10 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Search, Filter, MapPin, Clock, CheckCircle, AlertTriangle } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { INCIDENT_ICONS } from '@/lib/map'
 import { Incident, IncidentType } from '@/types'
+import { getIncidents } from '@/services/incidents'
 
 const MOCK_INCIDENTS: Incident[] = [
   {
@@ -68,8 +69,15 @@ export default function IncidentsPage() {
   const [filterStatus, setFilterStatus] = useState('todos')
   const [filterUrgency, setFilterUrgency] = useState('todos')
   const [selected, setSelected] = useState<Incident | null>(null)
+  const [incidents, setIncidents] = useState<Incident[]>([])
 
-  const filtered = MOCK_INCIDENTS.filter(inc => {
+  useEffect(() => {
+    getIncidents()
+      .then(data => setIncidents(data))
+      .catch(() => setIncidents([]))
+  }, [])
+
+  const filtered = incidents.filter(inc => {
     const matchSearch = inc.title.toLowerCase().includes(search.toLowerCase()) ||
       inc.location.address?.toLowerCase().includes(search.toLowerCase())
     const matchStatus = filterStatus === 'todos' || inc.status === filterStatus

@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { INCIDENT_COLORS, INCIDENT_ICONS } from '@/lib/map'
 import { Incident, IncidentType, CreateIncidentDto } from '@/types'
 import ReportForm from '@/components/incidents/ReportForm'
+import { getIncidents } from '@/services/incidents'
 
 const MOCK_INCIDENTS: Incident[] = [
   {
@@ -54,7 +55,7 @@ export default function MapPage() {
   const [selected, setSelected] = useState<Incident | null>(null)
   const [filter, setFilter] = useState<string>('todos')
   const [showForm, setShowForm] = useState(false)
-  const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS)
+  const [incidents, setIncidents] = useState<Incident[]>([])
 
   useEffect(() => {
     import('@/components/map/MapView').then(mod => {
@@ -62,26 +63,22 @@ export default function MapPage() {
     })
   }, [])
 
+  useEffect(() => {
+    getIncidents()
+      .then(data => setIncidents(data))
+      .catch(() => setIncidents([]))
+  }, [])
+
   const filtered = filter === 'todos'
     ? incidents
     : incidents.filter(i => i.type === filter)
 
-  const handleNewIncident = (data: CreateIncidentDto) => {
-    // Agregar el nuevo incidente a la lista
-    const newIncident: Incident = {
-      id: Date.now().toString(),
-      ...data,
-      status: 'activo',
-      userId: 'me',
-      userName: 'Tú',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      verifiedCount: 0,
-      views: 0,
+  const handleNewIncident = () => {
+      setShowForm(false)
+      getIncidents()
+        .then(data => setIncidents(data))
+        .catch(() => {})
     }
-    setIncidents(prev => [newIncident, ...prev])
-    setShowForm(false)
-  }
 
   return (
     <div className="flex h-[calc(100vh-56px)]">
